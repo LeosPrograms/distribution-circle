@@ -710,7 +710,7 @@
     zoomOnPinch={true}
     zoomOnDoubleClick={false}
   >
-    <Controls />
+    <Controls position="top-right" />
     <Background bgColor="#1a1a1a" />
     <MiniMap />
   </SvelteFlow>
