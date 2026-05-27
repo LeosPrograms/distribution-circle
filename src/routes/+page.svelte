@@ -209,6 +209,14 @@
     handle?.change(doc => { if (doc.nodes[nodeId]) doc.nodes[nodeId].data.isMinimized = isMinimized; });
   }
 
+  function setAllMinimized(isMinimized: boolean) {
+    handle?.change(doc => {
+      for (const id of Object.keys(doc.nodes)) {
+        if (id !== 'center') doc.nodes[id].data.isMinimized = isMinimized;
+      }
+    });
+  }
+
   setContext('updateNodeLabel', updateNodeLabel);
   setContext('updateNodeRequest', updateNodeRequest);
   setContext('updateCenterAvailable', updateCenterAvailable);
@@ -465,6 +473,8 @@
     <button on:click={exportRequestsCSV} class="btn btn-success">CSV</button>
     <button on:click={reorganizeCircle} class="btn btn-secondary">Organize</button>
     <button on:click={addNewNode} class="btn btn-primary">Add Person</button>
+    <button on:click={() => setAllMinimized(true)} class="btn btn-secondary" title="Minimize all nodes">− All</button>
+    <button on:click={() => setAllMinimized(false)} class="btn btn-secondary" title="Expand all nodes">□ All</button>
     <button on:click={copyShareLink} class="btn btn-share" title="Copy shareable link to clipboard">
       {linkCopied ? '✓ Copied!' : '🔗 Share'}
     </button>
