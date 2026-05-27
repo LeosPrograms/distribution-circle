@@ -208,6 +208,11 @@
       updateNodeIsMinimized(id, !isMinimized);
     }
   }
+
+  function fillPct(allocated: number, target: number): string {
+    if (!target) return allocated > 0 ? '100%' : '0%';
+    return Math.min(100, Math.round((allocated / target) * 100)) + '%';
+  }
 </script>
 
 <div class="custom-node" class:center-node={data.isCenter} class:peripheral-node={!data.isCenter} style={!data.isCenter && data.status ? `border: 3px ${data.isOffer ? "dashed" : "solid"} ${statusColors.border};` : ''}>
@@ -308,7 +313,7 @@
         {#if !data.isCenter && (data.requestA !== undefined || data.requestB !== undefined || data.requestC !== undefined || data.requestD !== undefined)}
         <div class="requests-container">
           {#if data.requestA !== undefined}
-            <div class="request-item" class:completed={completedRequests.a} data-tooltip="Missing: {inputValue - data.requestA < 0 ? ((inputValue - data.requestA) * -1) : 0}">
+            <div class="request-item" class:completed={completedRequests.a} data-tooltip="Missing: {inputValue - data.requestA < 0 ? ((inputValue - data.requestA) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.a ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestA)}, transparent {fillPct(inputValue, data.requestA)})">
               <span>
                 <span class="checkmark" class:completed={completedRequests.a}>
                   {completedRequests.a ? '✓' : ''}
@@ -325,7 +330,7 @@
             </div>
           {/if}
           {#if data.requestB !== undefined}
-            <div class="request-item" class:completed={completedRequests.b} data-tooltip="Missing: {inputValue - data.requestB < 0 ? ((inputValue - data.requestB) * -1) : 0}">
+            <div class="request-item" class:completed={completedRequests.b} data-tooltip="Missing: {inputValue - data.requestB < 0 ? ((inputValue - data.requestB) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.b ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestB)}, transparent {fillPct(inputValue, data.requestB)})">
               <span>
                 <span class="checkmark" class:completed={completedRequests.b}>
                   {completedRequests.b ? '✓' : ''}
@@ -342,7 +347,7 @@
             </div>
           {/if}
           {#if data.requestC !== undefined}
-            <div class="request-item" class:completed={completedRequests.c} data-tooltip="Missing: {inputValue - data.requestC < 0 ? ((inputValue - data.requestC) * -1) : 0}">
+            <div class="request-item" class:completed={completedRequests.c} data-tooltip="Missing: {inputValue - data.requestC < 0 ? ((inputValue - data.requestC) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.c ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestC)}, transparent {fillPct(inputValue, data.requestC)})">
               <span>
                 <span class="checkmark" class:completed={completedRequests.c}>
                   {completedRequests.c ? '✓' : ''}
@@ -359,7 +364,7 @@
             </div>
           {/if}
           {#if data.requestD !== undefined}
-            <div class="request-item" class:completed={completedRequests.d} data-tooltip="Missing: {inputValue - data.requestD < 0 ? ((inputValue - data.requestD) * -1) : 0}">
+            <div class="request-item" class:completed={completedRequests.d} data-tooltip="Missing: {inputValue - data.requestD < 0 ? ((inputValue - data.requestD) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.d ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestD)}, transparent {fillPct(inputValue, data.requestD)})">
               <span>
                 <span class="checkmark" class:completed={completedRequests.d}>
                   {completedRequests.d ? '✓' : ''}
@@ -482,10 +487,6 @@
     z-index: 1000;
     pointer-events: none;
     margin-bottom: 4px;
-  }
-
-  .request-item.completed {
-    background-color: #d4edda;
   }
 
   .request-item.completed .request-label {
