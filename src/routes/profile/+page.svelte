@@ -10,7 +10,7 @@
 
 	let { data }: Props = $props()
 	const state = $state(data)
-	const user: User = state.user
+	const user = state.user
 
 	let focusedField: HTMLInputElement | undefined = $state()
 	let message = $state('')

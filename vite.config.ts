@@ -5,6 +5,12 @@ import topLevelAwait from 'vite-plugin-top-level-await';
 
 export default defineConfig({
 	plugins: [wasm(), topLevelAwait(), sveltekit()],
+	build: {
+		target: 'esnext',
+	},
+	esbuild: {
+		target: 'esnext',
+	},
 	test: {
 		include: ['src/**/*.{test,spec}.{js,ts}']
 	},
