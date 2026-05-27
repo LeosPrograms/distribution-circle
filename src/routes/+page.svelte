@@ -132,8 +132,14 @@
     newStatusName = '';
   }
 
-  // Filter by status
-  let statusFilter: string | null = null;
+  // Filter by status (empty set = show all)
+  let statusFilters = new Set<string>();
+
+  function toggleStatusFilter(status: string) {
+    const next = new Set(statusFilters);
+    if (next.has(status)) next.delete(status); else next.add(status);
+    statusFilters = next;
+  }
 
   // Filter by unmet requirement level
   let requirementFilter: 'all' | 'full' | 'restrained' | 'minimum' | 'stretched' = 'all';
@@ -145,8 +151,8 @@
   $: filteredNodes = (() => {
     let result = nodes;
 
-    if (statusFilter) {
-      result = result.filter(node => node.data.isCenter || node.data.status === statusFilter);
+    if (statusFilters.size > 0) {
+      result = result.filter(node => node.data.isCenter || statusFilters.has(node.data.status ?? 'unfinished'));
     }
 
     if (offerFilter !== 'both') {
@@ -472,16 +478,23 @@
       <option value="people">Members Only</option>
       <option value="offers">Offers Only</option>
     </select>
-    <select 
-      class="status-filter-select"
-      value={statusFilter || ''}
-      on:change={(e) => statusFilter = (e.target as HTMLSelectElement).value || null}
-    >
-      <option value="">All Statuses</option>
-      {#each $allStatusesStore as status}
-        <option value={status}>{status}</option>
-      {/each}
-    </select>
+    <details class="status-filter-details">
+      <summary class="status-filter-summary">
+        {statusFilters.size === 0 ? 'All Statuses' : `${statusFilters.size} status${statusFilters.size > 1 ? 'es' : ''}`}
+      </summary>
+      <div class="status-filter-dropdown">
+        <label class="status-filter-item">
+          <input type="checkbox" checked={statusFilters.size === 0} on:change={() => statusFilters = new Set()} />
+          All
+        </label>
+        {#each $allStatusesStore as status}
+          <label class="status-filter-item">
+            <input type="checkbox" checked={statusFilters.has(status)} on:change={() => toggleStatusFilter(status)} />
+            {status}
+          </label>
+        {/each}
+      </div>
+    </details>
     <select 
       class="status-filter-select"
       value={requirementFilter}
@@ -593,7 +606,6 @@
     font-weight: 500;
   }
 
-  .status-filter-select,
   .offer-filter-select {
     padding: 6px 12px;
     border: 1px solid #ced4da;
@@ -605,16 +617,65 @@
     color: #495057;
   }
 
-  .status-filter-select:hover,
   .offer-filter-select:hover {
     border-color: #80bdff;
   }
 
-  .status-filter-select:focus,
   .offer-filter-select:focus {
     outline: none;
     border-color: #80bdff;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+  }
+
+  .status-filter-details {
+    position: relative;
+    display: inline-block;
+  }
+
+  .status-filter-summary {
+    padding: 6px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    list-style: none;
+    user-select: none;
+  }
+
+  .status-filter-summary::-webkit-details-marker { display: none; }
+
+  .status-filter-summary:hover {
+    border-color: #80bdff;
+  }
+
+  .status-filter-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 1000;
+    background: white;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 6px 0;
+    min-width: 150px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  .status-filter-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .status-filter-item:hover {
+    background-color: #f0f4ff;
   }
 
   .btn-primary {
