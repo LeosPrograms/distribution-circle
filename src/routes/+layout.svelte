@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
-	import 'bootstrap/scss/bootstrap.scss'
+	import 'bootstrap/dist/css/bootstrap.min.css'
 
 	interface Props {
 		children?: import('svelte').Snippet

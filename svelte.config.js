@@ -11,12 +11,20 @@ const baseCsp = [
 	'https://fonts.gstatic.com/', // recaptcha fonts
 	'http://localhost:8888', // local dev
 	'http://localhost:3000', // local dev
-	'connect-src',
 	'blob:',
-	'http:'
 ]
 
-if (!production) baseCsp.push('ws://localhost:3000')
+const connectSrc = [
+	'self',
+	'http://localhost:8888',
+	'http://localhost:3000',
+	'wss://sync.automerge.org', // Automerge sync server
+]
+
+if (!production) {
+	baseCsp.push('ws://localhost:3000')
+	connectSrc.push('ws://localhost:3000')
+}
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -33,9 +41,10 @@ const config = {
 			mode: 'auto',
 			directives: {
 				'default-src': [...baseCsp],
-				'script-src': ['unsafe-inline', ...baseCsp],
+				'script-src': ['unsafe-inline', 'wasm-unsafe-eval', ...baseCsp],
 				'img-src': ['data:', 'blob:', ...baseCsp],
 				'style-src': ['unsafe-inline', ...baseCsp],
+				'connect-src': [...connectSrc],
 				'object-src': ['none'],
 				'base-uri': ['self']
 			}

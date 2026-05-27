@@ -2,36 +2,17 @@
   import { SvelteFlow, Controls, Background, BackgroundVariant, MiniMap, Position } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
   import { writable } from 'svelte/store';
-  import { setContext } from 'svelte';
-  import { onMount } from 'svelte';
+  import { setContext, onMount } from 'svelte';
+  import { getRepo, isValidAutomergeUrl } from '$lib/automerge-repo';
+  import type { PlanDoc, PlanNode, PlanEdge } from '$lib/automerge-repo';
+  import type { DocHandle } from '@automerge/automerge-repo';
 
   // Custom node component with delete button
   import CustomNode from './CustomNode.svelte';
   import InteractiveEdge from './InteractiveEdge.svelte';
 
-  // Define node data types
-  type NodeData = {
-    label: string;
-    isCenter?: boolean;
-    available?: number;
-    color?: string;
-    requestA?: number;
-    requestB?: number;
-    requestC?: number;
-    requestD?: number;
-    nodeId?: string;
-    status?: string;
-    url?: string;
-    isOffer?: boolean;
-    isMinimized?: boolean;
-  };
-
-  type Node = {
-    id: string;
-    type: string;
-    data: NodeData;
-    position: { x: number; y: number };
-  };
+  type Node = PlanNode;
+  type Edge = PlanEdge;
 
   const nodeTypes = {
     custom: CustomNode
@@ -41,424 +22,187 @@
     interactive: InteractiveEdge
   };
 
-  const nodeDefaults = {
-    // No sourcePosition or targetPosition specified = connections attach to center
-  };
-
   // Central node
   const centerX = 400;
   const centerY = 350;
   const radius = 200;
 
-  // Function to calculate circular positions
-  function getCircularPosition(index: number, total: number, radius: number) {
+  // ── Layout helpers ────────────────────────────────────────────────────────
+  function getCircularPosition(index: number, total: number, r: number) {
     const angle = (2 * Math.PI * index) / total;
-    return {
-      x: centerX + radius * Math.cos(angle),
-      y: centerY + radius * Math.sin(angle)
-    };
+    return { x: centerX + r * Math.cos(angle), y: centerY + r * Math.sin(angle) };
   }
 
-  // Create circular arrangement with 8 nodes around center
-  const circularNodes = [
-    { label: '', color: '#FF6B6B', requestA: 0, requestB: 0, requestC: 0, requestD: 0 },
-    // { label: 'Daniel', color: '#FF6B6B', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Ling', color: '#4ECDC4', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Yuki', color: '#45B7D1', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Bob', color: '#96CEB4', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Alejandro', color: '#FFEAA7', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Kenji', color: '#DDA0DD', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Luigi', color: '#98D8C8', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 },
-    // { label: 'Stephanie', color: '#F7DC6F', requestA: Math.floor(Math.random() * 301) + 800, requestB: Math.floor(Math.random() * 401) + 600, requestC: Math.floor(Math.random() * 501) + 100 }
-  ];
+  function newNodeId(): string {
+    return `node-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  }
 
-  const initialNodes = [
-    // Central node
-    {
+  function createInitialDoc(): PlanDoc {
+    const center: PlanNode = {
       id: 'center',
       type: 'custom',
       data: { label: 'Central Hub', isCenter: true, available: 0 },
-      position: { x: centerX, y: centerY },
-      ...nodeDefaults
-    },
-    // Surrounding nodes in a circle
-    ...circularNodes.map((nodeData, index) => {
-      const position = getCircularPosition(index, circularNodes.length, radius);
-      return {
-        id: `node-${index + 1}`,
-        type: 'custom',
-        data: { 
-          label: nodeData.label, 
-          color: nodeData.color, 
-          requestA: nodeData.requestA,
-          requestB: nodeData.requestB,
-          requestC: nodeData.requestC,
-          requestD: nodeData.requestD,
-          nodeId: `node-${index + 1}`,
-          status: 'unfinished',
-          isOffer: false,
-          isMinimized: false
-        },
-        position,
-        ...nodeDefaults
-      };
-    })
-  ];
-
-  // Create edges from center to all surrounding nodes
-  const initialEdges = circularNodes.map((_, index) => ({
-    id: `center-node-${index + 1}`,
-    type: 'straight',
-    source: 'center',
-    target: `node-${index + 1}`,
-    data: { value: 0 }
-  }));
-
-  // Create reactive stores for nodes and edges
-  let nodes: Node[] = initialNodes;
-  let edges = initialEdges;
-  const edgesStore = writable(initialEdges);
-  let nodeCounter = circularNodes.length + 1;
-
-  // Load nodes and positions from localStorage on component mount
-  function loadNodesFromStorage() {
-    if (typeof window !== 'undefined') {
-      const savedNodes = localStorage.getItem('circularFlowNodes');
-      if (savedNodes) {
-        try {
-          const parsedNodes = JSON.parse(savedNodes);
-          nodes = parsedNodes;
-        } catch (error) {
-          console.error('Error loading nodes from storage:', error);
-          nodes = initialNodes;
-        }
-      }
-    }
+      position: { x: centerX, y: centerY }
+    };
+    return {
+      nodes: { center },
+      edges: {},
+      nodeCounter: 1,
+      statuses: ['unfinished', 'in progress', 'done', 'blocked'],
+      statusColors: {}
+    };
   }
 
-  // Save entire nodes array to localStorage
-  function saveNodesToStorage() {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('circularFlowNodes', JSON.stringify(nodes));
-      localStorage.setItem('circularFlowEdges', JSON.stringify(edges));
-    }
+  // ── Reactive state (derived from the Automerge doc) ───────────────────────
+  let nodes: Node[] = [];
+  let edges: Edge[] = [];
+  let isReady = false;
+  let docUrl = '';
+  let linkCopied = false;
+
+  const edgesStore = writable<Edge[]>([]);
+  const allStatusesStore = writable<string[]>(['unfinished', 'in progress', 'done', 'blocked']);
+  const statusColorsStore = writable<Record<string, string>>({});
+
+  // ── Automerge handle ──────────────────────────────────────────────────────
+  let handle: DocHandle<PlanDoc> | null = null;
+
+  function syncFromDoc(doc: PlanDoc) {
+    nodes = Object.values(doc.nodes ?? {});
+    edges = Object.values(doc.edges ?? {});
+    allStatusesStore.set(doc.statuses ? [...doc.statuses] : ['unfinished', 'in progress', 'done', 'blocked']);
+    statusColorsStore.set(doc.statusColors ? { ...doc.statusColors } : {});
+    edgesStore.set(Object.values(doc.edges ?? {}));
   }
 
-  // Load edges from localStorage
-  function loadEdgesFromStorage() {
-    if (typeof window !== 'undefined') {
-      const savedEdges = localStorage.getItem('circularFlowEdges');
-      if (savedEdges) {
-        try {
-          const parsedEdges = JSON.parse(savedEdges);
-          edges = parsedEdges;
-          edgesStore.set(parsedEdges); // Update the store when loading
-        } catch (error) {
-          console.error('Error loading edges from storage:', error);
-          edges = initialEdges;
-          edgesStore.set(initialEdges);
-        }
-      }
-    }
-  }
+  // ── Node / edge mutations (all go through handle.change) ─────────────────
 
-  // Handle node deletion
   function deleteNode(nodeId: string) {
-    // Don't allow deletion of center node
-    if (nodeId === 'center') {
-      alert('Cannot delete the central hub node.');
-      return;
-    }
-
-    // Remove the node
-    nodes = nodes.filter(node => node.id !== nodeId);
-    
-    // Remove all edges connected to this node
-    edges = edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId);
-    
-    // Save updated nodes to localStorage
-    saveNodesToStorage();
+    if (nodeId === 'center') { alert('Cannot delete the central hub node.'); return; }
+    handle?.change(doc => {
+      delete doc.nodes[nodeId];
+      for (const id of Object.keys(doc.edges)) {
+        const e = doc.edges[id];
+        if (e.source === nodeId || e.target === nodeId) delete doc.edges[id];
+      }
+    });
   }
 
-  // Set context for custom nodes to access delete function
   setContext('deleteNode', deleteNode);
 
-  // Store for all unique statuses across nodes
-  const allStatusesStore = writable(['unfinished', 'in progress', 'done', 'blocked']);
-  
-  // Store for status colors (status name -> color)
-  const statusColorsStore = writable<Record<string, string>>({});
-  
-  // Load statuses from localStorage
-  function loadStatusesFromStorage() {
-    if (typeof window !== 'undefined') {
-      const savedStatuses = localStorage.getItem('circularFlowStatuses');
-      if (savedStatuses) {
-        try {
-          allStatusesStore.set(JSON.parse(savedStatuses));
-        } catch (error) {
-          console.error('Error loading statuses:', error);
-        }
-      }
-      
-      const savedColors = localStorage.getItem('circularFlowStatusColors');
-      if (savedColors) {
-        try {
-          statusColorsStore.set(JSON.parse(savedColors));
-        } catch (error) {
-          console.error('Error loading status colors:', error);
-        }
-      }
-    }
-  }
-  
-  // Save statuses to localStorage
-  function saveStatusesToStorage(statuses: string[]) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('circularFlowStatuses', JSON.stringify(statuses));
-    }
-  }
-  
-  // Save status colors to localStorage
-  function saveStatusColorsToStorage(colors: Record<string, string>) {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('circularFlowStatusColors', JSON.stringify(colors));
-    }
-  }
-  
-  // Update status color
-  function updateStatusColor(status: string, color: string) {
-    statusColorsStore.update(colors => {
-      const updated = { ...colors, [status]: color };
-      saveStatusColorsToStorage(updated);
-      return updated;
-    });
-  }
-
-  // Handle updating node status
   function updateNodeStatus(nodeId: string, newStatus: string) {
-    allStatusesStore.update(statuses => {
-      // Add new status to the list if it doesn't exist
-      if (!statuses.includes(newStatus)) {
-        const updated = [...statuses, newStatus];
-        saveStatusesToStorage(updated);
-        return updated;
-      }
-      return statuses;
+    handle?.change(doc => {
+      if (!doc.statuses.includes(newStatus)) doc.statuses.push(newStatus);
+      if (doc.nodes[nodeId] && nodeId !== 'center') doc.nodes[nodeId].data.status = newStatus;
     });
-    
-    nodes = nodes.map(node => {
-      if (node.id === nodeId && node.id !== 'center') {
-        return { ...node, data: { ...node.data, status: newStatus } };
-      }
-      return node;
-    });
-    
-    // Save to localStorage
-    saveNodesToStorage();
   }
 
-  // Set context for custom nodes to access status functions
   setContext('updateNodeStatus', updateNodeStatus);
   setContext('allStatuses', allStatusesStore);
   setContext('statusColors', statusColorsStore);
 
-  // Delete a status from the list
+  function updateStatusColor(status: string, color: string) {
+    handle?.change(doc => { doc.statusColors[status] = color; });
+  }
+
   function deleteStatus(statusToDelete: string) {
-    // Don't allow deletion if any nodes are using this status
-    const nodesUsingStatus = nodes.filter(node => 
-      !node.data.isCenter && node.data.status === statusToDelete
-    );
-    
+    const nodesUsingStatus = nodes.filter(n => !n.data.isCenter && n.data.status === statusToDelete);
     if (nodesUsingStatus.length > 0) {
       alert(`Cannot delete "${statusToDelete}". It is being used by ${nodesUsingStatus.length} node(s).`);
       return;
     }
-    
-    allStatusesStore.update(statuses => {
-      const updated = statuses.filter(s => s !== statusToDelete);
-      saveStatusesToStorage(updated);
-      return updated;
-    });
-    
-    // Also remove the color for this status
-    statusColorsStore.update(colors => {
-      const updated = { ...colors };
-      delete updated[statusToDelete];
-      saveStatusColorsToStorage(updated);
-      return updated;
+    handle?.change(doc => {
+      const idx = doc.statuses.indexOf(statusToDelete);
+      if (idx !== -1) doc.statuses.splice(idx, 1);
+      delete doc.statusColors[statusToDelete];
     });
   }
 
   // Show/hide status manager
   let showStatusManager = false;
-  
+
   // New status input
   let newStatusName = '';
-  
-  // Add a new status
+
   function addNewStatus() {
     const trimmedName = newStatusName.trim();
-    
-    if (!trimmedName) {
-      alert('Please enter a status name');
-      return;
-    }
-    
-    if ($allStatusesStore.includes(trimmedName)) {
-      alert('This status already exists');
-      return;
-    }
-    
-    allStatusesStore.update(statuses => {
-      const updated = [trimmedName, ...statuses];
-      saveStatusesToStorage(updated);
-      return updated;
-    });
-    
-    // Clear the input
+    if (!trimmedName) { alert('Please enter a status name'); return; }
+    if ($allStatusesStore.includes(trimmedName)) { alert('This status already exists'); return; }
+    handle?.change(doc => { doc.statuses.unshift(trimmedName); });
     newStatusName = '';
   }
-  
+
   // Filter by status
   let statusFilter: string | null = null;
-  
+
   // Filter by unmet requirement level
   let requirementFilter: 'all' | 'full' | 'restrained' | 'minimum' | 'stretched' = 'all';
-  
+
   // Filter by isOffer (people, offers, or both)
   let offerFilter: 'both' | 'people' | 'offers' = 'both';
-  
+
   // Filtered nodes based on status filter and requirement filter
   $: filteredNodes = (() => {
     let result = nodes;
-    
-    // Apply status filter
+
     if (statusFilter) {
       result = result.filter(node => node.data.isCenter || node.data.status === statusFilter);
     }
-    
-    // Apply offer filter
+
     if (offerFilter !== 'both') {
       result = result.filter(node => {
         if (node.data.isCenter) return true;
-        if (offerFilter === 'offers') {
-          return node.data.isOffer === true;
-        } else { // 'people'
-          return !node.data.isOffer;
-        }
+        return offerFilter === 'offers' ? node.data.isOffer === true : !node.data.isOffer;
       });
     }
-    
-    // Apply requirement filter
+
     if (requirementFilter !== 'all') {
       result = result.filter(node => {
         if (node.data.isCenter) return true;
-        
-        // Get the edge value for this node
-        const edge = edges.find(e => 
+        const edge = edges.find(e =>
           (e.source === 'center' && e.target === node.id) ||
           (e.source === node.id && e.target === 'center')
         );
         const inputValue = edge?.data?.value || 0;
-        
-        // Check if requirement is unmet
-        if (requirementFilter === 'full') {
-          return node.data.requestA !== undefined && inputValue < (node.data.requestA || 0);
-        } else if (requirementFilter === 'restrained') {
-          return node.data.requestB !== undefined && inputValue < (node.data.requestB || 0);
-        } else if (requirementFilter === 'minimum') {
-          return node.data.requestC !== undefined && inputValue < (node.data.requestC || 0);
-        } else if (requirementFilter === 'stretched') {
-          return node.data.requestD !== undefined && inputValue < (node.data.requestD || 0);
-        }
-        
+        if (requirementFilter === 'full') return (node.data.requestA ?? 0) > inputValue;
+        if (requirementFilter === 'restrained') return (node.data.requestB ?? 0) > inputValue;
+        if (requirementFilter === 'minimum') return (node.data.requestC ?? 0) > inputValue;
+        if (requirementFilter === 'stretched') return (node.data.requestD ?? 0) > inputValue;
         return true;
       });
     }
-    
+
     return result;
   })();
 
-  // Handle updating node label
   function updateNodeLabel(nodeId: string, newLabel: string) {
-    nodes = nodes.map(node => {
-      if (node.id === nodeId) {
-        return { ...node, data: { ...node.data, label: newLabel } };
-      }
-      return node;
-    });
-    
-    // Save to localStorage
-    saveNodesToStorage();
+    handle?.change(doc => { if (doc.nodes[nodeId]) doc.nodes[nodeId].data.label = newLabel; });
   }
 
-  // Handle updating node request values
   function updateNodeRequest(nodeId: string, requestType: 'requestA' | 'requestB' | 'requestC' | 'requestD', newValue: number) {
-    nodes = nodes.map(node => {
-      if (node.id === nodeId && node.id !== 'center') {
-        return { ...node, data: { ...node.data, [requestType]: newValue } };
+    handle?.change(doc => {
+      if (doc.nodes[nodeId] && nodeId !== 'center') {
+        (doc.nodes[nodeId].data as any)[requestType] = newValue;
       }
-      return node;
     });
-    
-    // Save to localStorage
-    saveNodesToStorage();
   }
 
-  // Handle updating center node available amount
   function updateCenterAvailable(newValue: number) {
-    nodes = nodes.map(node => {
-      if (node.id === 'center') {
-        return { ...node, data: { ...node.data, available: newValue } };
-      }
-      return node;
-    });
-    
-    // Save to localStorage
-    saveNodesToStorage();
+    handle?.change(doc => { if (doc.nodes['center']) doc.nodes['center'].data.available = newValue; });
   }
 
-  // Handle updating node URL
   function updateNodeUrl(nodeId: string, url: string) {
-    nodes = nodes.map(node => {
-      if (node.id === nodeId) {
-        return { ...node, data: { ...node.data, url: url } };
-      }
-      return node;
-    });
-    
-    // Save to localStorage
-    saveNodesToStorage();
+    handle?.change(doc => { if (doc.nodes[nodeId]) doc.nodes[nodeId].data.url = url; });
   }
 
-  // Handle updating node isOffer
   function updateNodeIsOffer(nodeId: string, isOffer: boolean) {
-    nodes = nodes.map(node => {
-      if (node.id === nodeId) {
-        return { ...node, data: { ...node.data, isOffer: isOffer } };
-      }
-      return node;
-    });
-    
-    // Save to localStorage
-    saveNodesToStorage();
+    handle?.change(doc => { if (doc.nodes[nodeId]) doc.nodes[nodeId].data.isOffer = isOffer; });
   }
 
-  // Handle updating node isMinimized
   function updateNodeIsMinimized(nodeId: string, isMinimized: boolean) {
-    nodes = nodes.map(node => {
-      if (node.id === nodeId) {
-        return { ...node, data: { ...node.data, isMinimized: isMinimized } };
-      }
-      return node;
-    });
-    
-    // Save to localStorage
-    saveNodesToStorage();
+    handle?.change(doc => { if (doc.nodes[nodeId]) doc.nodes[nodeId].data.isMinimized = isMinimized; });
   }
 
-  // Set context for custom nodes to access update functions
   setContext('updateNodeLabel', updateNodeLabel);
   setContext('updateNodeRequest', updateNodeRequest);
   setContext('updateCenterAvailable', updateCenterAvailable);
@@ -466,212 +210,111 @@
   setContext('updateNodeIsOffer', updateNodeIsOffer);
   setContext('updateNodeIsMinimized', updateNodeIsMinimized);
 
-  // Handle edge value updates
   function updateEdgeValue(edgeId: string, newValue: number) {
-    // Update the edge data
-    edges = edges.map(edge => 
-      edge.id === edgeId 
-        ? { ...edge, data: { ...edge.data, value: newValue } }
-        : edge
-    );
-    
-    // Update the store as well
-    edgesStore.set(edges);
-    
-    // Save to localStorage
-    saveNodesToStorage();
+    handle?.change(doc => { if (doc.edges[edgeId]) doc.edges[edgeId].data.value = newValue; });
   }
 
-  // Set context for custom edges to access update function
   setContext('updateEdgeValue', updateEdgeValue);
-  
-  // Set context for nodes to access edge values
   setContext('edgesStore', edgesStore);
 
-  // Add a new node to the circle
+  // ── Graph operations ──────────────────────────────────────────────────────
+
   function addNewNode() {
-    const currentCircularNodes = nodes.filter(node => node.id !== 'center');
-    
-    // Find the highest node number to ensure unique IDs
-    const maxNodeNumber = currentCircularNodes.reduce((max, node) => {
-      const match = node.id.match(/node-(\d+)/);
-      if (match) {
-        const num = parseInt(match[1]);
-        return num > max ? num : max;
-      }
-      return max;
-    }, 0);
-    
-    const newNodeNumber = maxNodeNumber + 1;
-    const newIndex = currentCircularNodes.length;
-    const newNodeId = `node-${newNodeNumber}`;
-    nodeCounter = newNodeNumber + 1; // Update counter for next time
-
-    // Calculate position for new node (add it to the circle without reorganizing)
-    const position = getCircularPosition(newIndex, currentCircularNodes.length + 1, radius);
-
-    // Add the new node without recalculating existing node positions
-    const newNode = {
-      id: newNodeId,
+    const id = newNodeId();
+    const currentCircular = nodes.filter(n => n.id !== 'center');
+    const position = getCircularPosition(currentCircular.length, currentCircular.length + 1, radius);
+    const newNode: PlanNode = {
+      id,
       type: 'custom',
-      data: { 
-        label: "", 
-        color: '#A8E6CF', 
-        requestA: 0,
-        requestB: 0,
-        requestC: 0,
-        requestD: 0,
-        nodeId: newNodeId,
-        status: 'unfinished',
-        isOffer: false,
-        isMinimized: false
-      },
-      position,
-      ...nodeDefaults
+      data: { label: '', color: '#A8E6CF', requestA: 0, requestB: 0, requestC: 0, requestD: 0, nodeId: id, status: 'unfinished', isOffer: false, isMinimized: false },
+      position
     };
-
-    nodes = [...nodes, newNode];
-
-    // Add edge from center to new node
-    const newEdge = {
-      id: `center-${newNodeId}`,
-      type: 'straight',
-      source: 'center',
-      target: newNodeId,
-      data: { value: 0 }
-    };
-
-    edges = [...edges, newEdge];
-    edgesStore.set(edges); // Update the store immediately
-    saveNodesToStorage();
-  }
-
-  // Reorganize nodes in perfect circle
-  function reorganizeCircle() {
-    const circularNodes = nodes.filter(node => node.id !== 'center');
-    
-    nodes = nodes.map(node => {
-      if (node.id === 'center') {
-        return { ...node, position: { x: centerX, y: centerY } };
-      }
-      
-      const nodeIndex = circularNodes.findIndex(n => n.id === node.id);
-      if (nodeIndex !== -1) {
-        const newPosition = getCircularPosition(nodeIndex, circularNodes.length, radius);
-        return { ...node, position: newPosition };
-      }
-      return node;
+    handle?.change(doc => {
+      doc.nodes[id] = newNode;
+      doc.edges[`center-${id}`] = { id: `center-${id}`, type: 'straight', source: 'center', target: id, data: { value: 0 } };
     });
-
-    saveNodesToStorage();
   }
 
-  // Handle connection events from SvelteFlow
+  function reorganizeCircle() {
+    handle?.change(doc => {
+      const circular = Object.values(doc.nodes).filter(n => n.id !== 'center');
+      doc.nodes['center'].position = { x: centerX, y: centerY };
+      circular.forEach((node, i) => {
+        doc.nodes[node.id].position = getCircularPosition(i, circular.length, radius);
+      });
+    });
+  }
+
   function onConnect(params: any) {
     const { source, target } = params;
-    
-    // Only allow connections from center to other nodes or between circular nodes
-    const newEdge = {
-      id: `${source}-${target}`,
-      type: 'straight',
-      source: source,
-      target: target,
-      data: { value: 0 }
-    };
-    
-    // Check if edge already exists
-    const exists = edges.some(edge => edge.source === source && edge.target === target);
-    if (!exists) {
-      edges = [...edges, newEdge];
-      saveNodesToStorage();
-    }
+    const edgeId = `${source}-${target}`;
+    if (edges.some(e => e.source === source && e.target === target)) return;
+    handle?.change(doc => {
+      doc.edges[edgeId] = { id: edgeId, type: 'straight', source, target, data: { value: 0 } };
+    });
   }
 
-  // Handle node position changes when dragging
   function onNodeDragStop(event: any) {
     const node = event.targetNode;
-    if (node && node.position) {
-      nodes = nodes.map(n => 
-        n.id === node.id 
-          ? { ...n, position: { ...node.position } }
-          : n
-      );
-      saveNodesToStorage();
-    }
+    if (!node?.position) return;
+    handle?.change(doc => {
+      if (doc.nodes[node.id]) doc.nodes[node.id].position = { x: node.position.x, y: node.position.y };
+    });
   }
 
   function onNodeDrag(event: any) {
     const node = event.targetNode;
-    if (node && node.position) {
-      nodes = nodes.map(n => 
-        n.id === node.id 
-          ? { ...n, position: { ...node.position } }
-          : n
-      );
-    }
+    if (!node?.position) return;
+    // Update local state only during drag (avoid flooding automerge with every drag event)
+    nodes = nodes.map(n => n.id === node.id ? { ...n, position: { ...node.position } } : n);
   }
 
-  // Reset to initial state
   function resetLayout() {
-    const confirmReset = confirm('Are you sure you want to reset the layout? This will remove all changes and cannot be undone.');
-    if (!confirmReset) return;
-    
-    nodes = [...initialNodes];
-    edges = [...initialEdges];
-    nodeCounter = circularNodes.length + 1;
-    
-    // Reset statuses
-    const defaultStatuses = ['unfinished', 'done', 'flagged'];
-    allStatusesStore.set(defaultStatuses);
-    statusColorsStore.set({});
-    
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('circularFlowNodes');
-      localStorage.removeItem('circularFlowEdges');
-      localStorage.removeItem('circularFlowStatuses');
-      localStorage.removeItem('circularFlowStatusColors');
-    }
+    if (!confirm('Are you sure you want to reset the layout? This will remove all changes and cannot be undone.')) return;
+    const initial = createInitialDoc();
+    handle?.change(doc => {
+      for (const id of Object.keys(doc.nodes)) delete doc.nodes[id];
+      for (const id of Object.keys(doc.edges)) delete doc.edges[id];
+      doc.nodes['center'] = initial.nodes['center'];
+      doc.nodeCounter = 1;
+      doc.statuses.splice(0, doc.statuses.length, ...initial.statuses);
+      for (const k of Object.keys(doc.statusColors)) delete doc.statusColors[k];
+    });
   }
 
-  // Clear all edges
   function clearAllEdges() {
-    edges = [];
-    saveNodesToStorage();
+    handle?.change(doc => {
+      for (const id of Object.keys(doc.edges)) delete doc.edges[id];
+    });
   }
 
-  // Restore center connections
   function restoreCenterConnections() {
-    const circularNodes = nodes.filter(node => node.id !== 'center');
-    const centerEdges = circularNodes.map(node => ({
-      id: `center-${node.id}`,
-      type: 'straight',
-      source: 'center',
-      target: node.id,
-      data: { value: 0 }
-    }));
-    
-    // Remove existing center connections and add new ones
-    edges = edges.filter(edge => edge.source !== 'center' && edge.target !== 'center');
-    edges = [...edges, ...centerEdges];
-    saveNodesToStorage();
+    handle?.change(doc => {
+      for (const id of Object.keys(doc.edges)) {
+        const e = doc.edges[id];
+        if (e.source === 'center' || e.target === 'center') delete doc.edges[id];
+      }
+      for (const node of Object.values(doc.nodes)) {
+        if (node.id !== 'center') {
+          const edgeId = `center-${node.id}`;
+          doc.edges[edgeId] = { id: edgeId, type: 'straight', source: 'center', target: node.id, data: { value: 0 } };
+        }
+      }
+    });
   }
 
-  // Export graph data to JSON file
   function exportGraph() {
     const exportData = {
-      nodes: nodes,
-      edges: edges,
-      nodeCounter: nodeCounter,
+      nodes,
+      edges,
       statuses: $allStatusesStore,
       statusColors: $statusColorsStore,
       exportDate: new Date().toISOString(),
       version: '1.1'
     };
-    
     const dataStr = JSON.stringify(exportData, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
-    
     const link = document.createElement('a');
     link.href = url;
     link.download = `transfer-puzzle-${new Date().toISOString().split('T')[0]}.json`;
@@ -681,113 +324,72 @@
     URL.revokeObjectURL(url);
   }
 
-  // Import graph data from JSON file
   function importGraph() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'application/json,.json';
-    
     input.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      const file = target.files?.[0];
+      const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
           const importData = JSON.parse(event.target?.result as string);
-          
-          // Validate the data structure
-          if (importData.nodes && importData.edges) {
-            nodes = importData.nodes;
-            edges = importData.edges;
-            if (importData.nodeCounter) {
-              nodeCounter = importData.nodeCounter;
-            }
-            
-            // Import statuses if available
-            if (importData.statuses) {
-              allStatusesStore.set(importData.statuses);
-              saveStatusesToStorage(importData.statuses);
-            }
-            
-            // Import status colors if available
+          if (!importData.nodes || !importData.edges) { alert('Invalid file format.'); return; }
+          handle?.change(doc => {
+            for (const id of Object.keys(doc.nodes)) delete doc.nodes[id];
+            for (const id of Object.keys(doc.edges)) delete doc.edges[id];
+            const nodesArray: PlanNode[] = Array.isArray(importData.nodes) ? importData.nodes : Object.values(importData.nodes);
+            for (const n of nodesArray) doc.nodes[n.id] = n;
+            const edgesArray: PlanEdge[] = Array.isArray(importData.edges) ? importData.edges : Object.values(importData.edges);
+            for (const edge of edgesArray) doc.edges[edge.id] = edge;
+            if (importData.statuses) doc.statuses.splice(0, doc.statuses.length, ...importData.statuses);
             if (importData.statusColors) {
-              statusColorsStore.set(importData.statusColors);
-              saveStatusColorsToStorage(importData.statusColors);
+              for (const k of Object.keys(doc.statusColors)) delete doc.statusColors[k];
+              Object.assign(doc.statusColors, importData.statusColors);
             }
-            
-            // Save to localStorage
-            saveNodesToStorage();
-            
-            alert('Graph imported successfully!');
-          } else {
-            alert('Invalid file format. Please select a valid export file.');
-          }
+          });
+          alert('Graph imported successfully!');
         } catch (error) {
           console.error('Error importing graph:', error);
           alert('Error importing file. Please check the file format.');
         }
       };
-      
       reader.readAsText(file);
     };
-    
     input.click();
   }
 
-  // Export requests vs received data as CSV
   function exportRequestsCSV() {
-    // Get all non-center nodes
     const dataNodes = nodes.filter(node => !node.data.isCenter);
-    
-    // Build CSV header
     const headers = ['Name', 'Type', 'Full Request', 'Restrained Request', 'Minimum Request', 'Stretched Request', 'Allocated', 'URL'];
-    
-    // Build CSV rows
     const rows = dataNodes.map(node => {
-      // Find the edge connected to this node to get allocated value
-      const edge = edges.find(e => 
+      const edge = edges.find(e =>
         (e.source === 'center' && e.target === node.id) ||
         (e.source === node.id && e.target === 'center')
       );
       const allocated = edge?.data?.value || 0;
-      
-      // Get request values
-      const fullRequest = node.data.requestA ?? '';
-      const restrainedRequest = node.data.requestB ?? '';
-      const minimumRequest = node.data.requestC ?? '';
-      const stretchedRequest = node.data.requestD ?? '';
-      
       return [
         node.data.label || '',
         node.data.isOffer ? 'Offer' : 'Person',
-        fullRequest,
-        restrainedRequest,
-        minimumRequest,
-        stretchedRequest,
+        node.data.requestA ?? '',
+        node.data.requestB ?? '',
+        node.data.requestC ?? '',
+        node.data.requestD ?? '',
         allocated,
         node.data.url || ''
       ];
     });
-    
-    // Convert to CSV format
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(cell => {
-        // Escape cells that contain commas or quotes
-        const cellStr = String(cell);
-        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-          return `"${cellStr.replace(/"/g, '""')}"`;
-        }
-        return cellStr;
+        const s = String(cell);
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+        return s;
       }).join(','))
     ].join('\n');
-    
-    // Create and download the file
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
     const link = document.createElement('a');
     link.href = url;
     link.download = `transfer-puzzle-requests-${new Date().toISOString().split('T')[0]}.csv`;
@@ -797,15 +399,54 @@
     URL.revokeObjectURL(url);
   }
 
-  onMount(() => {
-    console.log("Loading nodes and edges from storage...");
-    loadNodesFromStorage();
-    loadEdgesFromStorage();
-    loadStatusesFromStorage();
+  // ── Share / collaboration helpers ─────────────────────────────────────────
+
+  async function copyShareLink() {
+    await navigator.clipboard.writeText(window.location.href);
+    linkCopied = true;
+    setTimeout(() => { linkCopied = false; }, 2000);
+  }
+
+  function newPlan() {
+    if (confirm('Start a fresh plan? This will open a new empty workspace in this tab.')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('doc');
+      window.location.href = url.toString();
+    }
+  }
+
+  // ── Initialization ────────────────────────────────────────────────────────
+
+  onMount(async () => {
+    const repo = getRepo();
+    const params = new URLSearchParams(window.location.search);
+    const docParam = params.get('doc');
+
+    let h: DocHandle<PlanDoc>;
+    if (docParam && isValidAutomergeUrl(docParam as any)) {
+      h = await repo.find<PlanDoc>(docParam as any);
+    } else {
+      h = repo.create<PlanDoc>(createInitialDoc());
+      const url = new URL(window.location.href);
+      url.searchParams.set('doc', h.url);
+      window.history.replaceState({}, '', url.toString());
+    }
+
+    handle = h;
+    docUrl = h.url;
+
+    const doc = await h.doc();
+    if (doc) syncFromDoc(doc);
+
+    h.on('change', ({ doc }) => syncFromDoc(doc));
+    isReady = true;
   });
 </script>
 
 <div id="graph-container">
+  {#if !isReady}
+    <div class="loading-overlay">Connecting to collaborative workspace…</div>
+  {/if}
   <div class="controls-panel">
     <button on:click={() => showStatusManager = !showStatusManager} class="btn btn-secondary">
       {showStatusManager ? 'Hide' : 'Manage'} Statuses
@@ -816,6 +457,10 @@
     <button on:click={exportRequestsCSV} class="btn btn-success">CSV</button>
     <button on:click={reorganizeCircle} class="btn btn-secondary">Organize</button>
     <button on:click={addNewNode} class="btn btn-primary">Add Person</button>
+    <button on:click={copyShareLink} class="btn btn-share" title="Copy shareable link to clipboard">
+      {linkCopied ? '✓ Copied!' : '🔗 Share'}
+    </button>
+    <button on:click={newPlan} class="btn btn-secondary" title="Start a fresh empty plan">New Plan</button>
     <select 
       class="offer-filter-select"
       value={offerFilter}
@@ -1133,5 +778,28 @@
 
   .delete-status-btn:active {
     transform: scale(0.95);
+  }
+
+  .btn-share {
+    background-color: #6f42c1;
+    color: white;
+  }
+
+  .btn-share:hover {
+    background-color: #5a32a3;
+  }
+
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(26, 26, 26, 0.85);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
   }
 </style>
