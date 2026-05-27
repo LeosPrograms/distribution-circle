@@ -224,6 +224,25 @@
   setContext('updateNodeIsOffer', updateNodeIsOffer);
   setContext('updateNodeIsMinimized', updateNodeIsMinimized);
 
+  function updateNodeRequestCEnabled(nodeId: string, enabled: boolean) {
+    handle?.change(doc => {
+      if (doc.nodes[nodeId]) {
+        doc.nodes[nodeId].data.requestCEnabled = enabled;
+        if (!enabled) doc.nodes[nodeId].data.requestCDescription = '';
+      }
+    });
+  }
+
+  function updateNodeRequestCDescription(nodeId: string, description: string) {
+    handle?.change(doc => { if (doc.nodes[nodeId]) doc.nodes[nodeId].data.requestCDescription = description; });
+  }
+
+  setContext('updateNodeRequestCEnabled', updateNodeRequestCEnabled);
+  setContext('updateNodeRequestCDescription', updateNodeRequestCDescription);
+
+  const showStretchedStore = writable(false);
+  setContext('showStretched', showStretchedStore);
+
   function updateEdgeValue(edgeId: string, newValue: number) {
     handle?.change(doc => { if (doc.edges[edgeId]) doc.edges[edgeId].data.value = newValue; });
   }
@@ -378,7 +397,7 @@
 
   function exportRequestsCSV() {
     const dataNodes = nodes.filter(node => !node.data.isCenter);
-    const headers = ['Name', 'Type', 'Full Request', 'Restrained Request', 'Minimum Request', 'Stretched Request', 'Allocated', 'URL'];
+    const headers = ['Name', 'Type', 'Regenerative add-on', 'Stress-free basics', 'Basics', 'Stretched', 'Allocated', 'URL'];
     const rows = dataNodes.map(node => {
       const edge = edges.find(e =>
         (e.source === 'center' && e.target === node.id) ||
@@ -388,9 +407,9 @@
       return [
         node.data.label || '',
         node.data.isOffer ? 'Offer' : 'Person',
-        node.data.requestA ?? '',
-        node.data.requestB ?? '',
         node.data.requestC ?? '',
+        node.data.requestB ?? '',
+        node.data.requestA ?? '',
         node.data.requestD ?? '',
         allocated,
         node.data.url || ''
@@ -475,6 +494,7 @@
     <button on:click={addNewNode} class="btn btn-primary">Add Person</button>
     <button on:click={() => setAllMinimized(true)} class="btn btn-secondary" title="Minimize all nodes">− All</button>
     <button on:click={() => setAllMinimized(false)} class="btn btn-secondary" title="Expand all nodes">□ All</button>
+    <button on:click={() => showStretchedStore.update(v => !v)} class="btn btn-secondary" title="Show/hide Stretched level">{$showStretchedStore ? 'Hide Stretched' : 'Show Stretched'}</button>
     <button on:click={copyShareLink} class="btn btn-share" title="Copy shareable link to clipboard">
       {linkCopied ? '✓ Copied!' : '🔗 Share'}
     </button>
@@ -511,9 +531,9 @@
       on:change={(e) => requirementFilter = (e.target as HTMLSelectElement).value as 'all' | 'full' | 'restrained' | 'minimum' | 'stretched'}
     >
       <option value="all">All Requirements</option>
-      <option value="full">Unmet Full</option>
-      <option value="restrained">Unmet Restrained</option>
-      <option value="minimum">Unmet Minimum</option>
+      <option value="minimum">Unmet Regenerative add-on</option>
+      <option value="restrained">Unmet Stress-free basics</option>
+      <option value="full">Unmet Basics</option>
       <option value="stretched">Unmet Stretched</option>
     </select>
   </div>

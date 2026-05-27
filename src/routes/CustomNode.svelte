@@ -29,6 +29,10 @@
   const updateNodeUrl = getContext('updateNodeUrl') as ((nodeId: string, url: string) => void) | undefined;
   const updateNodeIsOffer = getContext('updateNodeIsOffer') as ((nodeId: string, isOffer: boolean) => void) | undefined;
   const updateNodeIsMinimized = getContext('updateNodeIsMinimized') as ((nodeId: string, isMinimized: boolean) => void) | undefined;
+  const updateNodeRequestCEnabled = getContext('updateNodeRequestCEnabled') as ((nodeId: string, enabled: boolean) => void) | undefined;
+  const updateNodeRequestCDescription = getContext('updateNodeRequestCDescription') as ((nodeId: string, description: string) => void) | undefined;
+  const showStretchedStore = getContext('showStretched') as any;
+  $: showStretched = showStretchedStore ? $showStretchedStore : false;
   
   // Get edges store from context to access current edge values
   const edgesStore = getContext('edgesStore') as any;
@@ -310,24 +314,36 @@
             {/if}
           </div>
         {/if}
-        {#if !data.isCenter && (data.requestA !== undefined || data.requestB !== undefined || data.requestC !== undefined || data.requestD !== undefined)}
+        {#if !data.isCenter && (data.requestA !== undefined || data.requestB !== undefined)}
         <div class="requests-container">
-          {#if data.requestA !== undefined}
-            <div class="request-item" class:completed={completedRequests.a} data-tooltip="Missing: {inputValue - data.requestA < 0 ? ((inputValue - data.requestA) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.a ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestA)}, transparent {fillPct(inputValue, data.requestA)})">
+          {#if data.requestCEnabled}
+            <div class="addon-description-row">
+              <span class="addon-label">add-on</span><input
+                type="text"
+                value={data.requestCDescription || ''}
+                on:input={(e) => updateNodeRequestCDescription && updateNodeRequestCDescription(id, (e.target as HTMLInputElement).value)}
+                class="addon-description-input"
+                placeholder="What is this for?"
+              />
+              <button class="remove-addon-btn" on:click={() => updateNodeRequestCEnabled && updateNodeRequestCEnabled(id, false)} title="Remove regenerative add-on">×</button>
+            </div>
+            <div class="request-item" class:completed={completedRequests.c} data-tooltip="Missing: {inputValue - (data.requestC ?? 0) < 0 ? ((inputValue - (data.requestC ?? 0)) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.c ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestC ?? 0)}, transparent {fillPct(inputValue, data.requestC ?? 0)})">
               <span>
-                <span class="checkmark" class:completed={completedRequests.a}>
-                  {completedRequests.a ? '✓' : ''}
+                <span class="checkmark" class:completed={completedRequests.c}>
+                  {completedRequests.c ? '✓' : ''}
                 </span>
-                <span class="request-label">Full:</span>
+                <span class="request-label">Regenerative add-on:</span>
               </span>
-              <input 
-                type="text" 
-                value={data.requestA} 
-                on:input={(e) => updateNodeRequest && updateNodeRequest(id, 'requestA', Number((e.target as HTMLInputElement).value))}
+              <input
+                type="text"
+                value={data.requestC ?? 0}
+                on:input={(e) => updateNodeRequest && updateNodeRequest(id, 'requestC', Number((e.target as HTMLInputElement).value))}
                 class="request-input"
                 min="0"
               />
             </div>
+          {:else}
+            <button class="add-addon-btn" on:click={() => updateNodeRequestCEnabled && updateNodeRequestCEnabled(id, true)}>+ Regenerative add-on</button>
           {/if}
           {#if data.requestB !== undefined}
             <div class="request-item" class:completed={completedRequests.b} data-tooltip="Missing: {inputValue - data.requestB < 0 ? ((inputValue - data.requestB) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.b ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestB)}, transparent {fillPct(inputValue, data.requestB)})">
@@ -335,7 +351,7 @@
                 <span class="checkmark" class:completed={completedRequests.b}>
                   {completedRequests.b ? '✓' : ''}
                 </span>
-                <span class="request-label">Restrained:</span>
+                <span class="request-label">Stress-free basics:</span>
               </span>
               <input 
                 type="text" 
@@ -346,24 +362,24 @@
               />
             </div>
           {/if}
-          {#if data.requestC !== undefined}
-            <div class="request-item" class:completed={completedRequests.c} data-tooltip="Missing: {inputValue - data.requestC < 0 ? ((inputValue - data.requestC) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.c ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestC)}, transparent {fillPct(inputValue, data.requestC)})">
+          {#if data.requestA !== undefined}
+            <div class="request-item" class:completed={completedRequests.a} data-tooltip="Missing: {inputValue - data.requestA < 0 ? ((inputValue - data.requestA) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.a ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestA)}, transparent {fillPct(inputValue, data.requestA)})">
               <span>
-                <span class="checkmark" class:completed={completedRequests.c}>
-                  {completedRequests.c ? '✓' : ''}
+                <span class="checkmark" class:completed={completedRequests.a}>
+                  {completedRequests.a ? '✓' : ''}
                 </span>
-                <span class="request-label">Minimum:</span>
+                <span class="request-label">Basics:</span>
               </span>
               <input 
                 type="text" 
-                value={data.requestC} 
-                on:input={(e) => updateNodeRequest && updateNodeRequest(id, 'requestC', Number((e.target as HTMLInputElement).value))}
+                value={data.requestA} 
+                on:input={(e) => updateNodeRequest && updateNodeRequest(id, 'requestA', Number((e.target as HTMLInputElement).value))}
                 class="request-input"
                 min="0"
               />
             </div>
           {/if}
-          {#if data.requestD !== undefined}
+          {#if data.requestD !== undefined && showStretched}
             <div class="request-item" class:completed={completedRequests.d} data-tooltip="Missing: {inputValue - data.requestD < 0 ? ((inputValue - data.requestD) * -1) : 0}" style="background: linear-gradient(to right, {completedRequests.d ? '#d4edda' : '#fff3cd'} {fillPct(inputValue, data.requestD)}, transparent {fillPct(inputValue, data.requestD)})">
               <span>
                 <span class="checkmark" class:completed={completedRequests.d}>
@@ -497,6 +513,72 @@
   .request-item.completed .request-input {
     color: #155724;
     font-weight: bold;
+  }
+
+  .add-addon-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #c0c0c0;
+    font-size: 10px;
+    padding: 1px 2px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .add-addon-btn:hover {
+    color: #6c757d;
+  }
+
+  .addon-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #fff;
+    background: #adb5bd;
+    border-radius: 3px;
+    padding: 1px 4px 2px;
+    flex-shrink: 0;
+  }
+
+  .addon-description-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px;
+  }
+
+  .addon-description-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #ced4da;
+    font-size: 10px;
+    font-style: italic;
+    color: #495057;
+    padding: 1px 2px;
+    min-width: 0;
+  }
+
+  .addon-description-input:focus {
+    outline: none;
+    border-bottom-color: #007bff;
+  }
+
+  .remove-addon-btn {
+    background: transparent;
+    border: none;
+    color: #adb5bd;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .remove-addon-btn:hover {
+    color: #dc3545;
   }
 
   .label-input {

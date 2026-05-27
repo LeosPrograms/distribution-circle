@@ -13,6 +13,8 @@ export type NodeData = {
   requestA?: number
   requestB?: number
   requestC?: number
+  requestCEnabled?: boolean
+  requestCDescription?: string
   requestD?: number
   nodeId?: string
   status?: string
