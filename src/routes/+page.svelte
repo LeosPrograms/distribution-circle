@@ -572,18 +572,18 @@
     <div class="loading-overlay">Connecting to collaborative workspace…</div>
   {/if}
   <div class="controls-panel">
-    <button on:click={() => showStatusManager = !showStatusManager} class="btn btn-secondary">
+    <button on:click={() => showStatusManager = !showStatusManager} class="btn btn-c1">
       {showStatusManager ? 'Hide' : 'Manage'} Statuses
     </button>
-    <button on:click={resetLayout} class="btn btn-warning">Reset</button>
-    <button on:click={exportGraph} class="btn btn-success">Export</button>
-    <button on:click={importGraph} class="btn btn-info">Import</button>
-    <button on:click={exportRequestsCSV} class="btn btn-success">CSV</button>
-    <button on:click={reorganizeCircle} class="btn btn-secondary">Organize</button>
-    <button on:click={addNewNode} class="btn btn-primary">Add Person</button>
-    <button on:click={() => setAllMinimized(true)} class="btn btn-secondary" title="Minimize all nodes">− All</button>
-    <button on:click={() => setAllMinimized(false)} class="btn btn-secondary" title="Expand all nodes">□ All</button>
-    <button on:click={() => showStretchedStore.update(v => !v)} class="btn btn-secondary" title="Show/hide Stretched level">{$showStretchedStore ? 'Hide Stretched' : 'Show Stretched'}</button>
+    <button on:click={resetLayout} class="btn btn-c2">Reset</button>
+    <button on:click={exportGraph} class="btn btn-c3">Export</button>
+    <button on:click={importGraph} class="btn btn-c4">Import</button>
+    <button on:click={exportRequestsCSV} class="btn btn-c5">CSV</button>
+    <button on:click={reorganizeCircle} class="btn btn-c6">Organize</button>
+    <button on:click={addNewNode} class="btn btn-c7">Add Person</button>
+    <button on:click={() => setAllMinimized(true)} class="btn btn-c8" title="Minimize all nodes">− All</button>
+    <button on:click={() => setAllMinimized(false)} class="btn btn-c9" title="Expand all nodes">□ All</button>
+    <button on:click={() => showStretchedStore.update(v => !v)} class="btn btn-c10" title="Show/hide Stretched level">{$showStretchedStore ? 'Hide Stretched' : 'Show Stretched'}</button>
     <div class="auto-assign-group">
       <select class="offer-filter-select" bind:value={autoAssignLevel}>
         <option value="requestC">Regenerative add-on</option>
@@ -591,15 +591,15 @@
         <option value="requestA">Basics</option>
         <option value="requestD">Stretched</option>
       </select>
-      <button on:click={autoAssign} title="Set every node's allocation to this request level">Auto-assign</button>
+      <button on:click={autoAssign} class="btn-c11" title="Set every node's allocation to this request level">Auto-assign</button>
     </div>
-    <button on:click={copyShareLink} class="btn btn-share" title="Copy shareable link to clipboard">
+    <button on:click={copyShareLink} class="btn btn-c12" title="Copy shareable link to clipboard">
       {linkCopied ? '✓ Copied!' : '🔗 Share'}
     </button>
-    <button on:click={newPlan} class="btn btn-secondary" title="Start a fresh empty plan">New Plan</button>
+    <button on:click={newPlan} class="btn btn-c13" title="Start a fresh empty plan">New Plan</button>
     {#if recentPlans.length > 0}
     <details class="recent-plans-details">
-      <summary class="recent-plans-summary">Recent</summary>
+      <summary class="recent-plans-summary btn-c14">Recent</summary>
       <div class="recent-plans-dropdown">
         {#each recentPlans as plan}
           <div class="recent-plan-item" class:current={plan.url === docUrl}>
@@ -614,7 +614,7 @@
     </details>
     {/if}
     <select 
-      class="offer-filter-select"
+      class="offer-filter-select btn-c15"
       value={offerFilter}
       on:change={(e) => offerFilter = (e.target as HTMLSelectElement).value as 'both' | 'people' | 'offers'}
     >
@@ -623,7 +623,7 @@
       <option value="offers">Offers Only</option>
     </select>
     <details class="status-filter-details">
-      <summary class="status-filter-summary">
+      <summary class="status-filter-summary btn-c16">
         {statusFilters.size === 0 ? 'All Statuses' : `${statusFilters.size} status${statusFilters.size > 1 ? 'es' : ''}`}
       </summary>
       <div class="status-filter-dropdown">
@@ -640,7 +640,7 @@
       </div>
     </details>
     <select 
-      class="status-filter-select"
+      class="status-filter-select btn-c17"
       value={requirementFilter}
       on:change={(e) => requirementFilter = (e.target as HTMLSelectElement).value as 'all' | 'full' | 'restrained' | 'minimum' | 'stretched'}
     >
@@ -727,18 +727,18 @@
     position: absolute;
     top: 10px;
     left: 10px;
-    right: 10px;
+    bottom: 10px;
     z-index: 1000;
-    background: rgba(255, 255, 255, 0);
-    padding: 10px;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 10px 8px;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    width: auto;
-    max-width: calc(100% - 20px);
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+    width: 180px;
+    overflow-y: auto;
   }
 
   .btn {
@@ -752,33 +752,34 @@
 
   .auto-assign-group {
     display: flex;
+    flex-direction: column;
     align-items: stretch;
   }
 
   .auto-assign-group select {
-    border-radius: 4px 0 0 4px;
-    border-right: none;
+    border-radius: 4px 4px 0 0;
+    border-bottom: none;
     padding: 6px 10px;
-    border: 1px solid #ced4da;
-    background-color: white;
+    border: 1px solid hsl(210, 65%, 67%);
+    background-color: hsl(210, 65%, 89%);
     font-size: 13px;
     font-weight: 500;
-    color: #495057;
+    color: hsl(210, 65%, 28%);
     cursor: pointer;
   }
 
   .auto-assign-group select:focus {
     outline: none;
-    border-color: #80bdff;
+    border-color: hsl(210, 65%, 55%);
     z-index: 1;
     position: relative;
   }
 
   .auto-assign-group button {
-    border-radius: 0 4px 4px 0;
-    border: 1px solid #ced4da;
-    background-color: #f8f9fa;
-    color: #495057;
+    border-radius: 0 0 4px 4px;
+    border: 1px solid hsl(210, 65%, 67%);
+    background-color: hsl(210, 65%, 89%);
+    color: hsl(210, 65%, 28%);
     font-size: 13px;
     font-weight: 500;
     padding: 6px 12px;
@@ -787,8 +788,7 @@
   }
 
   .auto-assign-group button:hover {
-    background-color: #e2e6ea;
-    border-color: #adb5bd;
+    background-color: hsl(210, 65%, 82%);
   }
 
   .offer-filter-select {
@@ -800,6 +800,14 @@
     font-size: 14px;
     font-weight: 500;
     color: #495057;
+  }
+
+  .status-filter-select {
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
   }
 
   .offer-filter-select:hover {
@@ -862,8 +870,8 @@
 
   .recent-plans-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
+    top: 0;
+    left: calc(100% + 4px);
     z-index: 1100;
     background: white;
     border: 1px solid #ced4da;
@@ -938,8 +946,8 @@
 
   .status-filter-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
+    top: 0;
+    left: calc(100% + 4px);
     z-index: 1000;
     background: white;
     border: 1px solid #ced4da;
@@ -972,55 +980,10 @@
     background-color: #0056b3;
   }
 
-  .btn-warning {
-    background-color: #ffc107;
-    color: #212529;
-  }
-
-  .btn-warning:hover {
-    background-color: #e0a800;
-  }
-
-  .btn-danger {
-    background-color: #dc3545;
-    color: white;
-  }
-
-  .btn-danger:hover {
-    background-color: #c82333;
-  }
-
-  .btn-secondary {
-    background-color: #6c757d;
-    color: white;
-  }
-
-  .btn-secondary:hover {
-    background-color: #5a6268;
-  }
-
-  .btn-info {
-    background-color: #17a2b8;
-    color: white;
-  }
-
-  .btn-info:hover {
-    background-color: #138496;
-  }
-
-  .btn-success {
-    background-color: #28a745;
-    color: white;
-  }
-
-  .btn-success:hover {
-    background-color: #218838;
-  }
-
   .status-manager {
     position: absolute;
-    top: 60px;
-    left: 20px;
+    top: 10px;
+    left: 205px;
     z-index: 1000;
     background: white;
     padding: 15px;
@@ -1128,14 +1091,47 @@
     transform: scale(0.95);
   }
 
-  .btn-share {
-    background-color: #6f42c1;
-    color: white;
+  /* ── Rainbow controls (hues evenly spaced 0–336°, pastel fill) ─────────── */
+  .btn-c1, .btn-c2, .btn-c3, .btn-c4, .btn-c5, .btn-c6, .btn-c7, .btn-c8, .btn-c9,
+  .btn-c10, .btn-c11, .btn-c12, .btn-c13, .btn-c14, .btn-c15, .btn-c16, .btn-c17 {
+    border-width: 1px !important;
+    border-style: solid !important;
+    font-weight: 500;
   }
-
-  .btn-share:hover {
-    background-color: #5a32a3;
-  }
+  .btn-c1  { background-color: hsl(0,   65%, 90%) !important; color: hsl(0,   65%, 28%) !important; border-color: hsl(0,   65%, 68%) !important; }
+  .btn-c2  { background-color: hsl(21,  65%, 90%) !important; color: hsl(21,  65%, 28%) !important; border-color: hsl(21,  65%, 68%) !important; }
+  .btn-c3  { background-color: hsl(42,  65%, 88%) !important; color: hsl(42,  65%, 26%) !important; border-color: hsl(42,  65%, 65%) !important; }
+  .btn-c4  { background-color: hsl(63,  58%, 86%) !important; color: hsl(63,  58%, 24%) !important; border-color: hsl(63,  58%, 62%) !important; }
+  .btn-c5  { background-color: hsl(84,  55%, 87%) !important; color: hsl(84,  55%, 24%) !important; border-color: hsl(84,  55%, 62%) !important; }
+  .btn-c6  { background-color: hsl(105, 55%, 87%) !important; color: hsl(105, 55%, 24%) !important; border-color: hsl(105, 55%, 62%) !important; }
+  .btn-c7  { background-color: hsl(126, 55%, 87%) !important; color: hsl(126, 55%, 24%) !important; border-color: hsl(126, 55%, 62%) !important; }
+  .btn-c8  { background-color: hsl(147, 55%, 87%) !important; color: hsl(147, 55%, 24%) !important; border-color: hsl(147, 55%, 62%) !important; }
+  .btn-c9  { background-color: hsl(168, 55%, 87%) !important; color: hsl(168, 55%, 24%) !important; border-color: hsl(168, 55%, 62%) !important; }
+  .btn-c10 { background-color: hsl(189, 60%, 88%) !important; color: hsl(189, 60%, 24%) !important; border-color: hsl(189, 60%, 65%) !important; }
+  .btn-c11 { background-color: hsl(210, 65%, 89%) !important; color: hsl(210, 65%, 28%) !important; border-color: hsl(210, 65%, 67%) !important; }
+  .btn-c12 { background-color: hsl(231, 65%, 90%) !important; color: hsl(231, 65%, 30%) !important; border-color: hsl(231, 65%, 67%) !important; }
+  .btn-c13 { background-color: hsl(252, 65%, 90%) !important; color: hsl(252, 65%, 32%) !important; border-color: hsl(252, 65%, 67%) !important; }
+  .btn-c14 { background-color: hsl(273, 60%, 90%) !important; color: hsl(273, 60%, 32%) !important; border-color: hsl(273, 60%, 67%) !important; }
+  .btn-c15 { background-color: hsl(294, 55%, 90%) !important; color: hsl(294, 55%, 30%) !important; border-color: hsl(294, 55%, 67%) !important; }
+  .btn-c16 { background-color: hsl(315, 60%, 90%) !important; color: hsl(315, 60%, 30%) !important; border-color: hsl(315, 60%, 68%) !important; }
+  .btn-c17 { background-color: hsl(336, 65%, 90%) !important; color: hsl(336, 65%, 30%) !important; border-color: hsl(336, 65%, 68%) !important; }
+  .btn-c1:hover  { background-color: hsl(0,   65%, 82%) !important; }
+  .btn-c2:hover  { background-color: hsl(21,  65%, 82%) !important; }
+  .btn-c3:hover  { background-color: hsl(42,  65%, 80%) !important; }
+  .btn-c4:hover  { background-color: hsl(63,  58%, 78%) !important; }
+  .btn-c5:hover  { background-color: hsl(84,  55%, 79%) !important; }
+  .btn-c6:hover  { background-color: hsl(105, 55%, 79%) !important; }
+  .btn-c7:hover  { background-color: hsl(126, 55%, 79%) !important; }
+  .btn-c8:hover  { background-color: hsl(147, 55%, 79%) !important; }
+  .btn-c9:hover  { background-color: hsl(168, 55%, 79%) !important; }
+  .btn-c10:hover { background-color: hsl(189, 60%, 80%) !important; }
+  .btn-c11:hover { background-color: hsl(210, 65%, 82%) !important; }
+  .btn-c12:hover { background-color: hsl(231, 65%, 82%) !important; }
+  .btn-c13:hover { background-color: hsl(252, 65%, 82%) !important; }
+  .btn-c14:hover { background-color: hsl(273, 60%, 82%) !important; }
+  .btn-c15:hover { background-color: hsl(294, 55%, 82%) !important; }
+  .btn-c16:hover { background-color: hsl(315, 60%, 82%) !important; }
+  .btn-c17:hover { background-color: hsl(336, 65%, 82%) !important; }
 
   .loading-overlay {
     position: absolute;
