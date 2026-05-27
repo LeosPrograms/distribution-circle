@@ -247,6 +247,23 @@
     handle?.change(doc => { if (doc.edges[edgeId]) doc.edges[edgeId].data.value = newValue; });
   }
 
+  let autoAssignLevel: 'requestA' | 'requestB' | 'requestC' | 'requestD' = 'requestA';
+
+  function autoAssign() {
+    handle?.change(doc => {
+      for (const node of Object.values(doc.nodes)) {
+        if (node.id === 'center') continue;
+        const amount = (node.data as any)[autoAssignLevel] ?? 0;
+        const edgeId = Object.keys(doc.edges).find(eid => {
+          const e = doc.edges[eid];
+          return (e.source === 'center' && e.target === node.id) ||
+                 (e.source === node.id && e.target === 'center');
+        });
+        if (edgeId) doc.edges[edgeId].data.value = Math.max(doc.edges[edgeId].data.value, amount);
+      }
+    });
+  }
+
   setContext('updateEdgeValue', updateEdgeValue);
   setContext('edgesStore', edgesStore);
 
@@ -495,6 +512,15 @@
     <button on:click={() => setAllMinimized(true)} class="btn btn-secondary" title="Minimize all nodes">− All</button>
     <button on:click={() => setAllMinimized(false)} class="btn btn-secondary" title="Expand all nodes">□ All</button>
     <button on:click={() => showStretchedStore.update(v => !v)} class="btn btn-secondary" title="Show/hide Stretched level">{$showStretchedStore ? 'Hide Stretched' : 'Show Stretched'}</button>
+    <div class="auto-assign-group">
+      <select class="offer-filter-select" bind:value={autoAssignLevel}>
+        <option value="requestC">Regenerative add-on</option>
+        <option value="requestB">Stress-free basics</option>
+        <option value="requestA">Basics</option>
+        <option value="requestD">Stretched</option>
+      </select>
+      <button on:click={autoAssign} title="Set every node's allocation to this request level">Auto-assign</button>
+    </div>
     <button on:click={copyShareLink} class="btn btn-share" title="Copy shareable link to clipboard">
       {linkCopied ? '✓ Copied!' : '🔗 Share'}
     </button>
@@ -634,6 +660,47 @@
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
+  }
+
+  .auto-assign-group {
+    display: flex;
+    align-items: stretch;
+  }
+
+  .auto-assign-group select {
+    border-radius: 4px 0 0 4px;
+    border-right: none;
+    padding: 6px 10px;
+    border: 1px solid #ced4da;
+    background-color: white;
+    font-size: 13px;
+    font-weight: 500;
+    color: #495057;
+    cursor: pointer;
+  }
+
+  .auto-assign-group select:focus {
+    outline: none;
+    border-color: #80bdff;
+    z-index: 1;
+    position: relative;
+  }
+
+  .auto-assign-group button {
+    border-radius: 0 4px 4px 0;
+    border: 1px solid #ced4da;
+    background-color: #f8f9fa;
+    color: #495057;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .auto-assign-group button:hover {
+    background-color: #e2e6ea;
+    border-color: #adb5bd;
   }
 
   .offer-filter-select {
