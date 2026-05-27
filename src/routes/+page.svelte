@@ -25,7 +25,7 @@
   // Central node
   const centerX = 400;
   const centerY = 350;
-  const radius = 200;
+  const radius = 600;
 
   // ── Layout helpers ────────────────────────────────────────────────────────
   function getCircularPosition(index: number, total: number, r: number) {
@@ -239,8 +239,10 @@
     handle?.change(doc => {
       const circular = Object.values(doc.nodes).filter(n => n.id !== 'center');
       doc.nodes['center'].position = { x: centerX, y: centerY };
+      const nodeSpacing = 320;
+      const dynamicRadius = Math.max(radius, (circular.length * nodeSpacing) / (2 * Math.PI));
       circular.forEach((node, i) => {
-        doc.nodes[node.id].position = getCircularPosition(i, circular.length, radius);
+        doc.nodes[node.id].position = getCircularPosition(i, circular.length, dynamicRadius);
       });
     });
   }
