@@ -57,8 +57,46 @@
   let nodes: Node[] = [];
   let edges: Edge[] = [];
   let isReady = false;
+  let showPlanPicker = false;
   let docUrl = '';
   let linkCopied = false;
+
+  // ── Recent plans ─────────────────────────────────────────────────────────
+  const RECENT_KEY = 'transfer-puzzle-recent-plans';
+  const MAX_RECENT = 10;
+
+  type RecentPlan = { url: string; label: string; visitedAt: number };
+
+  let recentPlans: RecentPlan[] = [];
+
+  function loadRecentPlans() {
+    try {
+      recentPlans = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    } catch { recentPlans = []; }
+  }
+
+  function saveCurrentPlan(url: string, label: string) {
+    loadRecentPlans();
+    const filtered = recentPlans.filter(p => p.url !== url);
+    filtered.unshift({ url, label, visitedAt: Date.now() });
+    recentPlans = filtered.slice(0, MAX_RECENT);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentPlans));
+  }
+
+  function loadRecentPlan(url: string) {
+    const dest = new URL(window.location.href);
+    dest.searchParams.set('doc', url);
+    window.location.href = dest.toString();
+  }
+
+  function removeRecentPlan(url: string) {
+    recentPlans = recentPlans.filter(p => p.url !== url);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentPlans));
+  }
+
+  function formatDate(ts: number) {
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  }
 
   const edgesStore = writable<Edge[]>([]);
   const allStatusesStore = writable<string[]>(['unfinished', 'in progress', 'done', 'blocked']);
@@ -469,31 +507,65 @@
 
   // ── Initialization ────────────────────────────────────────────────────────
 
+  async function initHandle(h: DocHandle<PlanDoc>) {
+    handle = h;
+    docUrl = h.url;
+    const doc = await h.doc();
+    if (doc) syncFromDoc(doc);
+    loadRecentPlans();
+    saveCurrentPlan(h.url, doc?.nodes?.center?.data?.label || 'Untitled');
+    h.on('change', ({ doc }) => {
+      syncFromDoc(doc);
+      saveCurrentPlan(h.url, doc?.nodes?.center?.data?.label || 'Untitled');
+    });
+    isReady = true;
+  }
+
+  async function startNewPlan() {
+    showPlanPicker = false;
+    const repo = getRepo();
+    const h = repo.create<PlanDoc>(createInitialDoc());
+    const url = new URL(window.location.href);
+    url.searchParams.set('doc', h.url);
+    window.history.replaceState({}, '', url.toString());
+    await initHandle(h);
+  }
+
   onMount(async () => {
     const repo = getRepo();
     const params = new URLSearchParams(window.location.search);
     const docParam = params.get('doc');
 
-    let h: DocHandle<PlanDoc>;
     if (docParam && isValidAutomergeUrl(docParam as any)) {
-      h = await repo.find<PlanDoc>(docParam as any);
+      await initHandle(await repo.find<PlanDoc>(docParam as any));
     } else {
-      h = repo.create<PlanDoc>(createInitialDoc());
-      const url = new URL(window.location.href);
-      url.searchParams.set('doc', h.url);
-      window.history.replaceState({}, '', url.toString());
+      loadRecentPlans();
+      if (recentPlans.length > 0) {
+        showPlanPicker = true;
+      } else {
+        await startNewPlan();
+      }
     }
-
-    handle = h;
-    docUrl = h.url;
-
-    const doc = await h.doc();
-    if (doc) syncFromDoc(doc);
-
-    h.on('change', ({ doc }) => syncFromDoc(doc));
-    isReady = true;
   });
 </script>
+
+{#if showPlanPicker}
+  <div class="plan-picker-overlay">
+    <div class="plan-picker-modal">
+      <h2>Open a plan</h2>
+      <p class="plan-picker-sub">Pick a recent plan or start fresh.</p>
+      <div class="plan-picker-list">
+        {#each recentPlans as plan}
+          <button class="plan-picker-item" on:click={() => { showPlanPicker = false; loadRecentPlan(plan.url); }}>
+            <span class="plan-picker-label">{plan.label}</span>
+            <span class="plan-picker-date">{formatDate(plan.visitedAt)}</span>
+          </button>
+        {/each}
+      </div>
+      <button class="btn btn-primary plan-picker-new" on:click={startNewPlan}>+ New plan</button>
+    </div>
+  </div>
+{/if}
 
 <div id="graph-container">
   {#if !isReady}
@@ -525,6 +597,22 @@
       {linkCopied ? '✓ Copied!' : '🔗 Share'}
     </button>
     <button on:click={newPlan} class="btn btn-secondary" title="Start a fresh empty plan">New Plan</button>
+    {#if recentPlans.length > 0}
+    <details class="recent-plans-details">
+      <summary class="recent-plans-summary">Recent</summary>
+      <div class="recent-plans-dropdown">
+        {#each recentPlans as plan}
+          <div class="recent-plan-item" class:current={plan.url === docUrl}>
+            <button class="recent-plan-load" on:click={() => loadRecentPlan(plan.url)}>
+              <span class="recent-plan-label">{plan.label}</span>
+              <span class="recent-plan-date">{formatDate(plan.visitedAt)}</span>
+            </button>
+            <button class="recent-plan-remove" on:click={() => removeRecentPlan(plan.url)} title="Remove from recents">×</button>
+          </div>
+        {/each}
+      </div>
+    </details>
+    {/if}
     <select 
       class="offer-filter-select"
       value={offerFilter}
@@ -748,6 +836,106 @@
     border-color: #80bdff;
   }
 
+  .recent-plans-details {
+    position: relative;
+    display: inline-block;
+  }
+
+  .recent-plans-summary {
+    padding: 6px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background-color: white;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+    list-style: none;
+    user-select: none;
+  }
+
+  .recent-plans-summary::-webkit-details-marker { display: none; }
+
+  .recent-plans-summary:hover {
+    border-color: #80bdff;
+  }
+
+  .recent-plans-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 1100;
+    background: white;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 4px;
+    min-width: 220px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .recent-plan-item {
+    display: flex;
+    align-items: stretch;
+  }
+
+  .recent-plan-load {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: none !important;
+    border: none;
+    padding: 6px 8px;
+    cursor: pointer;
+    color: #333 !important;
+    text-align: left;
+    font-size: 13px;
+    font-family: inherit;
+    border-radius: 3px;
+  }
+
+  .recent-plan-load:hover {
+    background: #f0f2f5 !important;
+  }
+
+  .recent-plan-item.current .recent-plan-load {
+    font-weight: 600;
+  }
+
+  .recent-plan-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+  }
+
+  .recent-plan-date {
+    font-size: 11px;
+    color: #999;
+    flex-shrink: 0;
+    margin-left: 8px;
+  }
+
+  .recent-plan-remove {
+    background: none !important;
+    border: none;
+    color: #bbb !important;
+    cursor: pointer;
+    padding: 0 6px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 3px;
+    font-family: inherit;
+  }
+
+  .recent-plan-remove:hover {
+    color: #e74c3c !important;
+    background: #fdf0f0 !important;
+  }
+
   .status-filter-dropdown {
     position: absolute;
     top: calc(100% + 4px);
@@ -961,5 +1149,95 @@
     font-size: 18px;
     font-weight: 500;
     letter-spacing: 0.02em;
+  }
+
+  /* ── Plan picker ─────────────────────────────────────────────────────────── */
+  .plan-picker-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+  }
+
+  .plan-picker-modal {
+    background: #fff;
+    border: 1px solid #dde;
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    min-width: 340px;
+    max-width: 480px;
+    width: 90vw;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+    color: #222;
+  }
+
+  .plan-picker-modal h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1.3rem;
+    font-weight: 600;
+  }
+
+  .plan-picker-sub {
+    margin: 0 0 1.25rem;
+    color: #666;
+    font-size: 0.875rem;
+  }
+
+  .plan-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .plan-picker-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f4f5f7 !important;
+    border: 1px solid #d0d3da;
+    border-radius: 7px;
+    padding: 0.6rem 0.9rem;
+    cursor: pointer;
+    color: #222 !important;
+    text-align: left;
+    transition: background 0.15s, border-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    font-family: inherit;
+    font-size: 0.95rem;
+  }
+
+  .plan-picker-item:hover {
+    background: #e8eaf0 !important;
+    border-color: #6c63ff;
+  }
+
+  .plan-picker-label {
+    font-weight: 500;
+    font-size: 0.95rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+  }
+
+  .plan-picker-date {
+    font-size: 0.78rem;
+    color: #888;
+    flex-shrink: 0;
+    margin-left: 1rem;
+  }
+
+  .plan-picker-new {
+    width: 100%;
+    margin-top: 0.25rem;
   }
 </style>
