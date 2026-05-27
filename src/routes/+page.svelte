@@ -738,7 +738,6 @@
     gap: 6px;
     align-items: stretch;
     width: 180px;
-    overflow-y: auto;
   }
 
   .btn {
